@@ -1,4 +1,4 @@
-package main
+package capnp_go_conn
 
 import (
 	"encoding/binary"
