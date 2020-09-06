@@ -106,7 +106,7 @@ func (c *PersistConn) reconnect_PersistConn() {
 	c.reset <- true
 }
 
-func create_PersistConn(addr string, cid int64) *PersistConn {
+func Create_PersistConn(addr string, cid int64) *PersistConn {
 	conn := connect(addr, cid)
 
 	c := &PersistConn{
