@@ -37,31 +37,32 @@ func (cli *Client) dispatch(msg *capnp.Message) {
 }
 
 func (cli *Client) addConnection(c *conn.PersistConn) {
-	ch := make(chan *capnp.Message, 128)
-	cli.dispatchChans = append(cli.dispatchChans, ch)
-	go func(ch chan *capnp.Message) {
-		for msg := range ch {
-			c.Write(msg)
-		}
-	}(ch)
-	recvCh := make(chan *capnp.Message)
-
-	recvCase := reflect.SelectCase{
-		Dir:  reflect.SelectRecv,
-		Chan: reflect.ValueOf(ch),
+	{
+		ch := make(chan *capnp.Message, 128)
+		cli.dispatchChans = append(cli.dispatchChans, ch)
+		go func(ch chan *capnp.Message) {
+			for msg := range ch {
+				c.Write(msg)
+			}
+		}(ch)
 	}
 
-	go func(ch chan *capnp.Message, c *conn.PersistConn) {
-		for true {
-			log.Printf("Waiting to hear")
-			msg := c.Read()
-			log.Printf("Heard from remote")
-			ch <- msg
-			log.Printf("Written to channel")
+	{
+		recvCh := make(chan *capnp.Message, 2)
+		recvCase := reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(recvCh),
 		}
-	}(recvCh, c)
 
-	cli.addedConn <- recvCase
+		go func(ch chan *capnp.Message, c *conn.PersistConn) {
+			for true {
+				msg := c.Read()
+				ch <- msg
+			}
+		}(recvCh, c)
+
+		cli.addedConn <- recvCase
+	}
 }
 
 func (cli *Client) send(id int64, msg *capnp.Message) *api.ClientResponse {
@@ -81,7 +82,6 @@ func resolver_loop(cli *Client) {
 			log.Printf("new select case added, restarting loop)")
 			continue
 		}
-		log.Printf("Received msg from %d", i)
 		if !ok {
 			panic("receiving channel closed...")
 		}
@@ -136,12 +136,11 @@ func (cli *Client) AddConnection(addr string) {
 }
 
 func Create(cid int64) *Client {
-	log.Printf("V1")
 	pool := &sync.Pool{
 		New: func() interface{} {
 			return &resultPromise{
-				request:nil,
-				waiter: make(chan *api.ClientResponse),
+				request: nil,
+				waiter:  make(chan *api.ClientResponse),
 			}
 		},
 	}
@@ -156,8 +155,8 @@ func Create(cid int64) *Client {
 	recvSel = append(recvSel, newConnSel)
 	reqId := int64(0)
 	res := &Client{
-		cid : cid,
-		reqId : &reqId,
+		cid:           cid,
+		reqId:         &reqId,
 		dispatchChans: make([]chan *capnp.Message, 0),
 		pool:          pool,
 		promiseMap:    &pMap,
