@@ -20,10 +20,8 @@ type PersistConn struct {
 
 func (c *PersistConn) Read() (msg *capnp.Message) {
 	for true {
-		log.Printf("Trying to read")
 		select {
 		case msg := <-c.decoder_channel:
-		        log.Printf("Returning read value")
 			return msg
 		case <-c.reset:
 			continue
@@ -33,13 +31,11 @@ func (c *PersistConn) Read() (msg *capnp.Message) {
 }
 
 func (c *PersistConn) Write(msg *capnp.Message) {
-	log.Printf("Pushing msg to write channel")
 	c.encoder_channel <- msg
 }
 
 func encoder_loop(c *PersistConn, encoder *capnp.Encoder) {
 	for msg := range c.encoder_channel {
-		log.Printf("Got another msg to encode")
 		err := encoder.Encode(msg)
 		if err != nil {
 			log.Printf("Failed to encode")
@@ -47,13 +43,11 @@ func encoder_loop(c *PersistConn, encoder *capnp.Encoder) {
 			c.reconnect_PersistConn()
 			break
 		}
-		log.Printf("Encoded successfully")
 	}
 }
 
 func decoder_loop(c *PersistConn, decoder *capnp.Decoder) {
 	for true {
-		log.Printf("Waiting for next msg")
 		msg, err := decoder.Decode()
 		if err != nil {
 			log.Printf("Failed to encode")
@@ -61,9 +55,7 @@ func decoder_loop(c *PersistConn, decoder *capnp.Decoder) {
 			c.reconnect_PersistConn()
 			break
 		}
-		log.Printf("decoded successfully")
 		c.decoder_channel <- msg
-		log.Printf("Written to channel")
 	}
 }
 
