@@ -1,3 +1,0 @@
-[submodule "ocamlpaxos"]
-	path = ocamlpaxos
-	url = git@github.com:cjen1/ocamlpaxos

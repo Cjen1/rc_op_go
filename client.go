@@ -2,7 +2,7 @@ package rc_op_go
 
 import (
 	conn "github.com/Cjen1/rc_op_go/capnp_go_conn"
-	api "github.com/Cjen1/rc_op_go/client_api"
+	api "github.com/Cjen1/ocamlpaxos_api"
 	"log"
 	"reflect"
 	"sync"

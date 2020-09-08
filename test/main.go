@@ -2,7 +2,7 @@ package main
 
 import (
 	api "github.com/Cjen1/rc_op_go"
-	client_api "github.com/Cjen1/rc_op_go/client_api"
+	client_api "github.com/Cjen1/ocamlpaxos_api"
 	"log"
 	"sync"
 )
