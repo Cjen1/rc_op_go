@@ -104,8 +104,21 @@ func resolver_loop(cli *Client) {
 	}
 }
 
+func alive_loop (cli *Client) {
+	for true {
+		time.Sleep(15*time.Second)
+
+		cli.promiseMap.Range(func (key, value interface{}) bool {
+			log.Printf("Unresolved: %d",key)
+			return true
+		})
+	}
+}
+
 func (cli *Client) getId() int64 {
-	return atomic.AddInt64(cli.reqId, 1)
+	id := atomic.AddInt64(cli.reqId, 1)
+	id = id + cli.cid * 100000
+	return id
 }
 
 func (cli *Client) Write(key []byte, data []byte) *api.ClientResponse {
