@@ -117,18 +117,6 @@ func (cli *Client) retry_loop () {
 	}
 }
 
-func alive_loop (cli *Client) {
-	for true {
-		time.Sleep(15*time.Second)
-
-		cli.promiseMap.Range(func (key, value interface{}) bool {
-			log.Printf("Unresolved: %d",key)
-			return true
-		})
-		log.Printf("Printed unresolved")
-	}
-}
-
 func (cli *Client) getId() int64 {
 	id := atomic.AddInt64(cli.reqId, 1)
 	id = id + cli.cid * 100000
@@ -193,7 +181,6 @@ func Create(cid int64) *Client {
 	}
 
 	go resolver_loop(res)
-	//go res.retry_loop()
-	go alive_loop(res)
+	go res.retry_loop()
 	return res
 }
