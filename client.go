@@ -91,7 +91,7 @@ func resolver_loop(cli *Client) {
 			log.Printf("Could not parse error")
 			panic(err)
 		}
-		print(root.String())
+		log.Printf(root.String())
 		msg, _ := root.ClientResponse()
 		prom_intf, ok := cli.promiseMap.Load(msg.Id())
 		if !ok {
@@ -99,8 +99,10 @@ func resolver_loop(cli *Client) {
 			continue
 		}
 		prom := prom_intf.(*resultPromise)
+		log.Printf("Removing %d", msg.Id())
 		cli.promiseMap.Delete(msg.Id())
 		prom.waiter <- &msg
+		log.Printf("Resolved %d", msg.Id())
 	}
 }
 
