@@ -112,6 +112,7 @@ func alive_loop (cli *Client) {
 			log.Printf("Unresolved: %d",key)
 			return true
 		})
+		log.Printf("Printed unresolved")
 	}
 }
 
@@ -179,5 +180,6 @@ func Create(cid int64) *Client {
 	}
 
 	go resolver_loop(res)
+	go alive_loop(res)
 	return res
 }
