@@ -68,8 +68,8 @@ func (cli *Client) addConnection(c *conn.PersistConn) {
 func (cli *Client) send(id int64, msg *capnp.Message) *api.ClientResponse {
 	prom := cli.pool.Get().(*resultPromise)
 	prom.request = msg
-	cli.dispatch(msg)
 	cli.promiseMap.Store(id, prom)
+	cli.dispatch(msg)
 	return <-prom.waiter
 }
 
@@ -103,6 +103,17 @@ func resolver_loop(cli *Client) {
 		cli.promiseMap.Delete(msg.Id())
 		prom.waiter <- &msg
 		log.Printf("Resolved %d", msg.Id())
+	}
+}
+
+func (cli *Client) retry_loop () {
+	for true {
+		time.Sleep(cli.retryTimeout)
+		cli.promiseMap.Range(func (key, value interface{}) bool {
+			cli.dispatch(value.(*capnp.Message))
+			log.Printf("Retried %d", key)
+			return true
+		})
 	}
 }
 
@@ -182,6 +193,7 @@ func Create(cid int64) *Client {
 	}
 
 	go resolver_loop(res)
+	//go res.retry_loop()
 	go alive_loop(res)
 	return res
 }
