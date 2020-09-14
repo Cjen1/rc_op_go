@@ -16,6 +16,11 @@ type resultPromise struct {
 	waiter  chan *api.ClientResponse
 }
 
+type mapStruct struct {
+	prom *resultPromise
+	msg *capnp.Message
+}
+
 type Client struct {
 	cid           int64
 	reqId         *int64
@@ -68,7 +73,8 @@ func (cli *Client) addConnection(c *conn.PersistConn) {
 func (cli *Client) send(id int64, msg *capnp.Message) *api.ClientResponse {
 	prom := cli.pool.Get().(*resultPromise)
 	prom.request = msg
-	cli.promiseMap.Store(id, prom)
+	ms := mapStruct{prom:prom, msg:msg}
+	cli.promiseMap.Store(id, &ms)
 	cli.dispatch(msg)
 	return <-prom.waiter
 }
@@ -93,12 +99,13 @@ func resolver_loop(cli *Client) {
 		}
 		log.Printf(root.String())
 		msg, _ := root.ClientResponse()
-		prom_intf, ok := cli.promiseMap.Load(msg.Id())
+		ms_intf, ok := cli.promiseMap.Load(msg.Id())
 		if !ok {
 			//Promise doesn't exist in map => is resolved already
 			continue
 		}
-		prom := prom_intf.(*resultPromise)
+		ms := ms_intf.(*mapStruct)
+		prom := *ms.prom
 		log.Printf("Removing %d", msg.Id())
 		cli.promiseMap.Delete(msg.Id())
 		prom.waiter <- &msg
@@ -110,7 +117,7 @@ func (cli *Client) retry_loop () {
 	for true {
 		time.Sleep(cli.retryTimeout)
 		cli.promiseMap.Range(func (key, value interface{}) bool {
-			cli.dispatch(value.(*capnp.Message))
+			cli.dispatch(value.(*mapStruct).msg)
 			log.Printf("Retried %d", key)
 			return true
 		})
