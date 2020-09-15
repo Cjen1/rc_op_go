@@ -126,8 +126,8 @@ func (cli *Client) retry_loop () {
 
 func (cli *Client) getId() int64 {
 	id := atomic.AddInt64(cli.reqId, 1)
-	id = id + cli.cid * 100000
-	return id
+	rid := id + cli.cid * 100000
+	return rid
 }
 
 func (cli *Client) Write(key []byte, data []byte) *api.ClientResponse {
