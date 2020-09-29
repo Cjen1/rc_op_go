@@ -1,8 +1,8 @@
 package rc_op_go
 
 import (
-	conn "github.com/Cjen1/rc_op_go/capnp_go_conn"
 	api "github.com/Cjen1/ocamlpaxos_api"
+	conn "github.com/Cjen1/rc_op_go/capnp_go_conn"
 	"log"
 	"reflect"
 	"sync"
@@ -18,14 +18,13 @@ type resultPromise struct {
 
 type mapStruct struct {
 	prom *resultPromise
-	msg *capnp.Message
+	msg  *capnp.Message
 }
 
 type Client struct {
 	cid           int64
 	reqId         *int64
 	dispatchChans []chan *capnp.Message
-	pool          *sync.Pool
 	promiseMap    *sync.Map
 	retryTimeout  time.Duration
 	recvSel       []reflect.SelectCase
@@ -71,9 +70,12 @@ func (cli *Client) addConnection(c *conn.PersistConn) {
 }
 
 func (cli *Client) send(id int64, msg *capnp.Message) *api.ClientResponse {
-	prom := cli.pool.Get().(*resultPromise)
+	prom := &resultPromise{
+		request: nil,
+		waiter:  make(chan *api.ClientResponse, 1),
+	}
 	prom.request = msg
-	ms := mapStruct{prom:prom, msg:msg}
+	ms := mapStruct{prom: prom, msg: msg}
 	cli.promiseMap.Store(id, &ms)
 	cli.dispatch(msg)
 	return <-prom.waiter
@@ -108,15 +110,18 @@ func resolver_loop(cli *Client) {
 		prom := *ms.prom
 		log.Printf("Removing %d", msg.Id())
 		cli.promiseMap.Delete(msg.Id())
-		prom.waiter <- &msg
+		select {
+		case prom.waiter <- &msg:
+		default: //Skip writting if already something there
+		}
 		log.Printf("Resolved %d", msg.Id())
 	}
 }
 
-func (cli *Client) retry_loop () {
+func (cli *Client) retry_loop() {
 	for true {
 		time.Sleep(cli.retryTimeout)
-		cli.promiseMap.Range(func (key, value interface{}) bool {
+		cli.promiseMap.Range(func(key, value interface{}) bool {
 			cli.dispatch(value.(*mapStruct).msg)
 			log.Printf("Retried %d", key)
 			return true
@@ -126,11 +131,12 @@ func (cli *Client) retry_loop () {
 
 func (cli *Client) getId() int64 {
 	id := atomic.AddInt64(cli.reqId, 1)
-	rid := id + cli.cid * 100000
+	rid := id + cli.cid*100000
 	return rid
 }
 
 func (cli *Client) Write(key []byte, data []byte) *api.ClientResponse {
+	log.Printf("Writing")
 	cmsg, seg, _ := capnp.NewMessage(capnp.MultiSegment(nil))
 	root, _ := api.NewRootServerMessage(seg)
 	resp, _ := root.NewClientRequest()
@@ -142,6 +148,7 @@ func (cli *Client) Write(key []byte, data []byte) *api.ClientResponse {
 }
 
 func (cli *Client) Read(key []byte) *api.ClientResponse {
+	log.Printf("Writing")
 	cmsg, seg, _ := capnp.NewMessage(capnp.MultiSegment(nil))
 	root, _ := api.NewRootServerMessage(seg)
 	resp, _ := root.NewClientRequest()
@@ -153,19 +160,16 @@ func (cli *Client) Read(key []byte) *api.ClientResponse {
 }
 
 func (cli *Client) AddConnection(addr string) {
+	log.Printf("Adding %s", addr)
+	log.Printf("AddConn Create conn")
 	c := conn.Create_PersistConn(addr, cli.cid)
+	log.Printf("AddConn add conn")
 	cli.addConnection(c)
+	log.Printf("Added %s", addr)
 }
 
 func Create(cid int64) *Client {
-	pool := &sync.Pool{
-		New: func() interface{} {
-			return &resultPromise{
-				request: nil,
-				waiter:  make(chan *api.ClientResponse),
-			}
-		},
-	}
+	log.Printf("Starting Client")
 	var pMap sync.Map
 
 	recvSel := make([]reflect.SelectCase, 0)
@@ -180,7 +184,6 @@ func Create(cid int64) *Client {
 		cid:           cid,
 		reqId:         &reqId,
 		dispatchChans: make([]chan *capnp.Message, 0),
-		pool:          pool,
 		promiseMap:    &pMap,
 		retryTimeout:  500 * time.Millisecond,
 		recvSel:       recvSel,
@@ -189,5 +192,6 @@ func Create(cid int64) *Client {
 
 	go resolver_loop(res)
 	go res.retry_loop()
+	log.Printf("Created client")
 	return res
 }
